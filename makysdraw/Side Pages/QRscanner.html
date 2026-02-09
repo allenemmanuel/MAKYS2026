@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple QR Scanner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-top: 30px;
+        }
+        .scanner-box {
+            width: 100%;
+            height: 400px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 20px;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .scan-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 250px;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            box-shadow: 0 0 0 1000px rgba(0,0,0,0.7);
+        }
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: #00ff00;
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">QR Code Scanner</h1>
+        
+        <div class="scanner-box">
+            <video id="video" autoplay playsinline></video>
+            <div class="scan-overlay">
+                <div class="scan-line"></div>
+            </div>
+        </div>
+        
+        <div class="result mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Scan Result:</h5>
+                    <p id="result" class="card-text text-muted">No QR code detected yet</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls text-center">
+            <button id="startBtn" class="btn btn-success btn-lg">
+                <i class="fas fa-play"></i> Start Scanner
+            </button>
+            <button id="stopBtn" class="btn btn-danger btn-lg" disabled>
+                <i class="fas fa-stop"></i> Stop Scanner
+            </button>
+            <button id="switchBtn" class="btn btn-info btn-lg">
+                <i class="fas fa-camera-rotate"></i> Switch Camera
+            </button>
+        </div>
+        
+        <div class="mt-4">
+            <h4>Instructions:</h4>
+            <ol>
+                <li>Click "Start Scanner" button</li>
+                <li>Allow camera permissions when prompted</li>
+                <li>Point camera at QR code</li>
+                <li>Wait for detection (green border will flash)</li>
+                <li>Scanned code will appear above</li>
+            </ol>
+            <div class="alert alert-info">
+                <strong>Note:</strong> This scanner works best in Chrome/Firefox on desktop or mobile. 
+                Make sure no other app is using your camera.
+            </div>
+        </div>
+    </div>
+
+    <!-- Font Awesome for icons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <!-- Using a different QR library that's more reliable -->
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1"></script>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const video = document.getElementById('video');
+        const result = document.getElementById('result');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const switchBtn = document.getElementById('switchBtn');
+        
+        let codeReader = null;
+        let stream = null;
+        let facingMode = 'environment'; // 'environment' for rear camera, 'user' for front
+        let scanning = false;
+        
+        // Initialize the scanner
+        function initScanner() {
+            codeReader = new ZXing.BrowserQRCodeReader();
+        }
+        
+        // Start scanning
+        async function startScanner() {
+            try {
+                console.log('Starting scanner...');
+                
+                // Stop any existing stream
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                
+                // Request camera access
+                const constraints = {
+                    video: {
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log('Camera access granted');
+                
+                // Set video source
+                video.srcObject = stream;
+                await video.play();
+                console.log('Video playing');
+                
+                // Start decoding
+                startDecoding();
+                
+                // Update UI
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                scanning = true;
+                
+            } catch (error) {
+                console.error('Error starting scanner:', error);
+                
+                if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                    alert('No camera found. Please connect a camera and try again.');
+                } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    alert('Camera permission denied. Please allow camera access and try again.');
+                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                    alert('Camera is already in use by another application. Please close other apps using the camera.');
+                } else {
+                    alert('Error accessing camera: ' + error.message);
+                }
+                
+                // Reset UI
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+        }
+        
+        // Start decoding QR codes
+        function startDecoding() {
+            if (!codeReader) return;
+            
+            // Clear any existing decoding
+            if (codeReader._decoderWorker) {
+                codeReader.reset();
+            }
+            
+            // Start decoding
+            codeReader.decodeFromVideoElement(video, (resultText, err) => {
+                if (resultText) {
+                    handleScanResult(resultText.text);
+                }
+                
+                if (err && !(err instanceof ZXing.NotFoundException)) {
+                    console.warn('QR Code error:', err);
+                }
+            });
+        }
+        
+        // Handle scan result
+        function handleScanResult(text) {
+            console.log('QR Code detected:', text);
+            
+            // Update result display
+            result.textContent = text;
+            result.className = 'card-text text-success fw-bold';
+            
+            // Visual feedback
+            const overlay = document.querySelector('.scan-overlay');
+            overlay.style.borderColor = '#28a745';
+            overlay.style.boxShadow = '0 0 0 1000px rgba(40, 167, 69, 0.2)';
+            
+            setTimeout(() => {
+                overlay.style.borderColor = '#00ff00';
+                overlay.style.boxShadow = '0 0 0 1000px rgba(0,0,0,0.7)';
+            }, 500);
+            
+            // Optional: Add to Firebase or local storage
+            // You can add your Firebase integration here
+            addToLocalStorage(text);
+        }
+        
+        // Stop scanning
+        function stopScanner() {
+            if (scanning) {
+                // Stop decoding
+                if (codeReader) {
+                    codeReader.reset();
+                }
+                
+                // Stop video stream
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+                
+                // Clear video
+                video.srcObject = null;
+                
+                // Update UI
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                scanning = false;
+                result.textContent = 'Scanner stopped';
+                result.className = 'card-text text-muted';
+            }
+        }
+        
+        // Switch camera
+        async function switchCamera() {
+            if (!scanning) return;
+            
+            facingMode = facingMode === 'environment' ? 'user' : 'environment';
+            
+            // Restart scanner with new camera
+            stopScanner();
+            setTimeout(() => {
+                startScanner();
+            }, 100);
+        }
+        
+        // Add scanned code to local storage (for testing)
+        function addToLocalStorage(text) {
+            let scannedCodes = JSON.parse(localStorage.getItem('scannedCodes') || '[]');
+            scannedCodes.push({
+                text: text,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('scannedCodes', JSON.stringify(scannedCodes.slice(-20))); // Keep last 20
+        }
+        
+        // Event listeners
+        startBtn.addEventListener('click', startScanner);
+        stopBtn.addEventListener('click', stopScanner);
+        switchBtn.addEventListener('click', switchCamera);
+        
+        // Initialize on load
+        initScanner();
+        
+        // Test function to verify camera access
+        async function testCameraAccess() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                console.log('Available cameras:', videoDevices);
+                
+                if (videoDevices.length === 0) {
+                    alert('No cameras detected on this device.');
+                }
+            } catch (error) {
+                console.error('Error enumerating devices:', error);
+            }
+        }
+        
+        // Run camera test
+        testCameraAccess();
+        
+        // Handle page visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && scanning) {
+                stopScanner();
+            }
+        });
+    });
+    </script>
+</body>
+</html>
