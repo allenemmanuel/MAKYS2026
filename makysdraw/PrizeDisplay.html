@@ -168,7 +168,7 @@
 
     <div class="ctrl-bar" id="ctrlBar">
         <button onclick="prevPage()" title="Previous"><i class="fas fa-chevron-left"></i></button>
-        <span class="page-indicator" id="pageIndicator">(1/8)</span>
+        <span class="page-indicator" id="pageIndicator">(1/12)</span>
         <button onclick="nextPage()" title="Next"><i class="fas fa-chevron-right"></i></button>
         <a href="index.html" title="Home"><i class="fas fa-home"></i></a>
         <button onclick="toggleFullscreen()" title="Fullscreen"><i class="fas fa-expand" id="fsIcon"></i></button>
@@ -192,7 +192,8 @@
         const database = firebase.database();
 
         const CELLS_PER_PAGE = 25;
-        const TOTAL_CELLS = 200;
+        const TOTAL_CELLS = 300;
+        const TOTAL_PAGES = 12;
         let currentPage = 0;
         let prizes = [];
         let results = [];
@@ -227,7 +228,7 @@
                 cell.style.display = (i >= start && i < end) ? 'flex' : 'none';
             });
 
-            document.getElementById('pageIndicator').textContent = `(${p + 1}/8)`;
+            document.getElementById('pageIndicator').textContent = `(${p + 1}/${TOTAL_PAGES})`;
         }
 
         function render() {
@@ -276,12 +277,12 @@
         });
 
         function prevPage() {
-            currentPage = (currentPage - 1 + 8) % 8;
+            currentPage = (currentPage - 1 + TOTAL_PAGES) % TOTAL_PAGES;
             goToPage(currentPage);
         }
 
         function nextPage() {
-            currentPage = (currentPage + 1) % 8;
+            currentPage = (currentPage + 1) % TOTAL_PAGES;
             goToPage(currentPage);
         }
 

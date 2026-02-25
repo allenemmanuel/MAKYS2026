@@ -23,7 +23,7 @@
     <div class="config-container">
         <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Home</a>
         <h1>Prize Configuration</h1>
-        <p class="text-muted">Edit prize names. Order 1–200 maps to Prize Display v2. Save to sync.</p>
+        <p class="text-muted">Edit prize names. Order 1–300 maps to Prize Display v2. Save to sync.</p>
         <div class="mb-4 p-3 rounded" style="background: #2d2d44;">
             <h5 class="mb-3">Display Settings</h5>
             <div class="d-flex align-items-center gap-2 mb-2">
@@ -34,6 +34,12 @@
                 <label for="prizeNameFontSize" class="mb-0" style="color: #aaa;">Prize name font size (px):</label>
                 <input type="number" id="prizeNameFontSize" min="8" max="48" value="14" style="width: 80px; padding: 6px 10px; background: #1a1a2e; border: 1px solid #444; color: #fff; border-radius: 4px;">
             </div>
+        </div>
+        <div class="mb-4 p-3 rounded" style="background: #2d2d44;">
+            <h5 class="mb-2">Import prize list</h5>
+            <p class="text-muted small mb-2">Paste your list below—one prize per line (e.g. copy from Excel). First 300 lines will fill slots 1–300.</p>
+            <textarea id="importTextarea" rows="8" placeholder="Panasonic SR-Y1BG Rice Cooker [1.8L]&#10;PHISON PCF-6081 6&quot; CIRCULATION STAND FAN&#10;..." style="width: 100%; padding: 10px; background: #1a1a2e; border: 1px solid #444; color: #fff; border-radius: 4px; font-size: 0.9rem;"></textarea>
+            <button type="button" class="btn mt-2" id="importBtn" style="background: #9C27B0; color: #fff;"><i class="fas fa-file-import"></i> Import into list</button>
         </div>
         <div class="mb-3">
             <button class="btn btn-load me-2" id="loadDefaultsBtn"><i class="fas fa-download"></i> Load Defaults</button>
@@ -60,7 +66,7 @@
         const grid = document.getElementById('prizeGrid');
         const inputs = [];
 
-        for (let i = 0; i < 200; i++) {
+        for (let i = 0; i < 300; i++) {
             const div = document.createElement('div');
             div.className = 'prize-item';
             div.innerHTML = `<label>${i + 1}.</label><input type="text" data-index="${i}" placeholder="Prize ${i + 1}">`;
@@ -93,7 +99,7 @@
                 const html = await res.text();
                 const regex = /<div class="prize-name"[^>]*>([\s\S]*?)<\/div>/g;
                 let m, i = 0;
-                while ((m = regex.exec(html)) !== null && i < 200) {
+                while ((m = regex.exec(html)) !== null && i < 300) {
                     const name = m[1].replace(/\s+/g, ' ').trim().replace(/^\d+\.\s*/, '');
                     if (inputs[i]) inputs[i].value = name;
                     i++;
@@ -107,6 +113,16 @@
             } catch (e) {
                 alert('Could not load: ' + e.message);
             }
+        });
+
+        document.getElementById('importBtn').addEventListener('click', () => {
+            const raw = document.getElementById('importTextarea').value || '';
+            const lines = raw.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
+            const count = Math.min(lines.length, 300);
+            for (let i = 0; i < 300; i++) {
+                inputs[i].value = i < count ? lines[i] : '';
+            }
+            alert(`Imported ${count} prize(s) into slots 1–${count}. Click "Save to Firebase" to sync to Prize Display.`);
         });
 
         document.getElementById('saveBtn').addEventListener('click', () => {
